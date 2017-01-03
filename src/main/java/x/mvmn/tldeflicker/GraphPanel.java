@@ -281,6 +281,9 @@ public class GraphPanel extends JPanel {
 					@Override
 					public void run() {
 						frame.getContentPane().remove(lblProgress);
+						frame.invalidate();
+						frame.revalidate();
+						frame.repaint();
 					}
 				});
 			} catch (Exception e) {

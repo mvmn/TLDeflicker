@@ -10,6 +10,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -80,7 +81,25 @@ public class ImageUtil {
 		}
 	}
 
-	public static Map<String, Double> calculateAverageBrightnesses(File[] files) throws Exception {
+	public static class Pair<A, B> {
+		private final A a;
+		private final B b;
+
+		public Pair(A a, B b) {
+			this.a = a;
+			this.b = b;
+		}
+
+		public A getA() {
+			return a;
+		}
+
+		public B getB() {
+			return b;
+		}
+	}
+
+	public static Map<String, Double> calculateAverageBrightnesses(File[] files, Function<Pair<File, Double>, Void> callback) throws Exception {
 		final Map<String, Double> values = Collections.synchronizedMap(new HashMap<>());
 		final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 		for (final File file : files) {
@@ -88,7 +107,15 @@ public class ImageUtil {
 				@Override
 				public Void call() throws Exception {
 					BufferedImage bufferedImage = ImageIO.read(file);
-					values.put(file.getAbsolutePath(), calc(bufferedImage));
+					Double brightnessVal = calc(bufferedImage);
+					values.put(file.getAbsolutePath(), brightnessVal);
+					if (callback != null) {
+						try {
+							callback.apply(new Pair<File, Double>(file, brightnessVal));
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
 					return null;
 				}
 			});

@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
@@ -14,11 +15,18 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
+import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
+
+import x.mvmn.tldeflicker.ImageUtil.Pair;
 
 public class GraphUtil {
 
@@ -94,16 +102,33 @@ public class GraphUtil {
 
 	public static void main(String args[]) throws Exception {
 		if (args.length > 0) {
+			JPanel progressPanel = new JPanel(new GridLayout(2, 1));
+
+			progressPanel.setBorder(BorderFactory.createTitledBorder("Progress"));
+			JProgressBar pbGeneral = new JProgressBar(0, args.length);
+			pbGeneral.setIndeterminate(false);
+			JProgressBar pbFolder = new JProgressBar();
+			pbFolder.setIndeterminate(true);
+			JPanel p1 = new JPanel(new BorderLayout());
+			p1.add(new JLabel("Folders: "), BorderLayout.WEST);
+			p1.add(pbGeneral, BorderLayout.CENTER);
+			progressPanel.add(p1);
+			JPanel p2 = new JPanel(new BorderLayout());
+			p2.add(new JLabel("Files: "), BorderLayout.WEST);
+			p2.add(pbFolder, BorderLayout.CENTER);
+			progressPanel.add(p2);
 			Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 			BufferedImage bufImg = createGraphCanvas((int) (screenSize.width * 0.8), (int) (screenSize.height * 0.8), Color.WHITE);
 			JFrame frame = new JFrame("Average brightnesses of images");
 			frame.getContentPane().setLayout(new BorderLayout());
 			frame.getContentPane().add(new JScrollPane(new JLabel(new ImageIcon(bufImg))), BorderLayout.CENTER);
+			frame.getContentPane().add(progressPanel, BorderLayout.SOUTH);
 			frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			frame.pack();
 			frame.setVisible(true);
 
 			for (int argIndex = 0; argIndex < args.length; argIndex++) {
+				final int argIndexFinal = argIndex;
 				File dir = new File(args[argIndex]);
 				System.out.println("Processing " + dir.getAbsolutePath());
 				if (dir.exists() && dir.isDirectory()) {
@@ -119,25 +144,63 @@ public class GraphUtil {
 						}
 					});
 					Arrays.sort(files, FileByNameComparator.INSTANCE);
-					Map<String, Double> values = ImageUtil.calculateAverageBrightnesses(files);
+
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							pbFolder.setIndeterminate(false);
+							pbFolder.setMinimum(0);
+							pbFolder.setMaximum(files.length);
+							pbFolder.setValue(0);
+						}
+					});
+					Map<String, Double> values = ImageUtil.calculateAverageBrightnesses(files, new Function<ImageUtil.Pair<File, Double>, Void>() {
+						@Override
+						public Void apply(Pair<File, Double> t) {
+							SwingUtilities.invokeLater(new Runnable() {
+
+								@Override
+								public void run() {
+									pbFolder.setValue(pbFolder.getValue() + 1);
+								}
+							});
+							return null;
+						}
+					});
 					List<Double> valuesList = new ArrayList<>(files.length);
 					for (File file : files) {
 						valuesList.add(values.get(file.getAbsolutePath()));
 					}
 
 					Color color = Color.getHSBColor(((float) argIndex) / args.length * 0.8f, 1f, 0.5f);
-					paintGraphOver(bufImg, graph2d, color, valuesList, 0d, 100d, 10d);
-					graph2d.setColor(color);
-					graph2d.setFont(frame.getFont());
-					graph2d.drawString(dir.getName(), 30f,
-							bufImg.getHeight() - 10f - ((float) argIndex) / args.length * (graph2d.getFontMetrics().getHeight() * 1.4f));
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							paintGraphOver(bufImg, graph2d, color, valuesList, 0d, 100d, 10d);
+							graph2d.setColor(color);
+							graph2d.setFont(frame.getFont());
+							graph2d.drawString(dir.getName(), 30f,
+									bufImg.getHeight() - 10f - ((float) argIndexFinal) / args.length * (graph2d.getFontMetrics().getHeight() * 1.4f));
 
-					frame.invalidate();
-					frame.revalidate();
-					frame.repaint();
+							pbGeneral.setValue(argIndexFinal + 1);
+							pbFolder.setIndeterminate(true);
+							frame.invalidate();
+							frame.revalidate();
+							frame.repaint();
+						}
+					});
 
 				}
 			}
+			SwingUtilities.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					frame.getContentPane().remove(progressPanel);
+					frame.invalidate();
+					frame.revalidate();
+					frame.repaint();
+				}
+			});
 			System.out.println("All done.");
 		}
 	}

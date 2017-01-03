@@ -18,9 +18,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -107,10 +109,20 @@ public class GraphUtil {
 		Set<String> fileExtensions = new HashSet<>();
 		fileExtensions.add("jpg");
 		fileExtensions.add("jpeg");
-		showBrighnessGraph(Arrays.asList(args), fileExtensions, FileByNameComparator.INSTANCE);
+		if (args.length > 0) {
+			showBrighnessGraph(Arrays.asList(args).stream().map(File::new).filter(File::exists).filter(File::isDirectory).collect(Collectors.toList()),
+					fileExtensions, FileByNameComparator.INSTANCE);
+		} else {
+			JFileChooser jfc = new JFileChooser();
+			jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+			jfc.setMultiSelectionEnabled(true);
+			if (JFileChooser.APPROVE_OPTION == jfc.showOpenDialog(null)) {
+				showBrighnessGraph(Arrays.asList(jfc.getSelectedFiles()), fileExtensions, FileByNameComparator.INSTANCE);
+			}
+		}
 	}
 
-	public static void showBrighnessGraph(List<String> folders, Set<String> fileExtensions, FileByNameComparator fileComparator) {
+	public static void showBrighnessGraph(List<File> folders, Set<String> fileExtensions, FileByNameComparator fileComparator) {
 		if (folders.size() > 0) {
 			try {
 				JPanel progressPanel = new JPanel(new GridLayout(2, 1));
@@ -144,7 +156,7 @@ public class GraphUtil {
 
 				for (int argIndex = 0; argIndex < folders.size(); argIndex++) {
 					final int argIndexFinal = argIndex;
-					File dir = new File(folders.get(argIndex));
+					File dir = folders.get(argIndex);
 					if (dir.exists() && dir.isDirectory()) {
 						SwingUtilities.invokeLater(new Runnable() {
 							@Override
@@ -207,7 +219,7 @@ public class GraphUtil {
 								graph2d.setColor(color);
 								graph2d.setFont(frame.getFont());
 								graph2d.drawString(dir.getName(), 30f,
-										bufImg.getHeight() - 10f - ((float) argIndexFinal) / folders.size() * (graph2d.getFontMetrics().getHeight() * 1.4f));
+										bufImg.getHeight() - 10f - ((float) argIndexFinal) / folders.size() * (graph2d.getFontMetrics().getHeight() * 2f));
 
 								pbGeneral.setValue(argIndexFinal + 1);
 								pbFolder.setIndeterminate(true);

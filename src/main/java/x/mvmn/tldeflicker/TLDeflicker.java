@@ -72,7 +72,7 @@ public class TLDeflicker {
 				double dGreen = (stGreen - dvGreen) / dvGreen;
 				double dBlue = (stBlue - dvBlue) / dvBlue;
 
-				for (int k = start; k < end; k++) {
+				for (int k = start; k <= end; k++) {
 					int numberInSequence = k - start;
 					BufferedImage biToAdjust = ImageIO.read(files[k]);
 					BufferedImage biOutput;
@@ -86,10 +86,8 @@ public class TLDeflicker {
 						biOutput = biToAdjust;
 					}
 					ImageUtil.writeJpeg(biOutput, new File(outPath, files[k].getName()), 1f);
-					System.out.println("Processed file " + k);
+					System.out.println("Processed file #" + k + " " + files[k].getName());
 				}
-				ImageUtil.writeJpeg(biLastDeviated, new File(outPath, files[end].getName()), 1f);
-				System.out.println("Processed file " + end);
 			}
 		}
 	}

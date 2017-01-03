@@ -81,28 +81,13 @@ public class ImageUtil {
 		}
 	}
 
-	public static class Pair<A, B> {
-		private final A a;
-		private final B b;
-
-		public Pair(A a, B b) {
-			this.a = a;
-			this.b = b;
-		}
-
-		public A getA() {
-			return a;
-		}
-
-		public B getB() {
-			return b;
-		}
-	}
-
-	public static Map<String, Double> calculateAverageBrightnesses(File[] files, Function<Pair<File, Double>, Void> callback) throws Exception {
+	public static Map<String, Double> calculateAverageBrightnesses(File[] files, Function<Tuple<Integer, File, Double, Void, Void>, Void> callback)
+			throws Exception {
 		final Map<String, Double> values = Collections.synchronizedMap(new HashMap<>());
 		final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-		for (final File file : files) {
+		for (int i = 0; i < files.length; i++) {
+			final int index = i;
+			final File file = files[i];
 			executorService.submit(new Callable<Void>() {
 				@Override
 				public Void call() throws Exception {
@@ -111,7 +96,7 @@ public class ImageUtil {
 					values.put(file.getAbsolutePath(), brightnessVal);
 					if (callback != null) {
 						try {
-							callback.apply(new Pair<File, Double>(file, brightnessVal));
+							callback.apply(new Tuple<Integer, File, Double, Void, Void>(index, file, brightnessVal, null, null));
 						} catch (Exception e) {
 							e.printStackTrace();
 						}

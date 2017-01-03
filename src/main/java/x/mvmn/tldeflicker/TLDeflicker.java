@@ -163,7 +163,7 @@ public class TLDeflicker {
 					lblQuality.setText(String.format("%03d", sliderQuality.getValue()));
 				}
 			});
-			JCheckBox cbGraphBrightness = new JCheckBox("Show input/output brightnesses graph", true);
+			JCheckBox cbGraphBrightness = new JCheckBox("Show brightnesses graph (may slow things down)", true);
 			JButton btnDoDeflicker = new JButton("Process images");
 			btnDoDeflicker.addActionListener(new ActionListener() {
 				@Override
@@ -212,7 +212,24 @@ public class TLDeflicker {
 			frame.getContentPane()
 					.add(gridLayoutPanel("Exposure EXIF metadata", borderLayoutPanel(new JLabel("EXIF directory: "), tfExifDirectory, null, null, null),
 							borderLayoutPanel(new JLabel("EXIF tag: "), tfExifTag, lookupExif, null, null)));
-			frame.getContentPane().add(gridLayoutPanel("", cbGraphBrightness, new JLabel("Note: brightness calculation will slow things down")));
+			JButton btnBuildGraph = new JButton("Build brightness graph for existing images");
+			btnBuildGraph.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					JFileChooser jfc = new JFileChooser();
+					jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+					jfc.setMultiSelectionEnabled(true);
+					if (JFileChooser.APPROVE_OPTION == jfc.showOpenDialog(null)) {
+						new Thread() {
+							public void run() {
+								GraphPanel.showBrighnessGraph(Arrays.asList(jfc.getSelectedFiles()), ImageUtil.getSupportedImageFormatExtensions(),
+										FileByNameComparator.INSTANCE);
+							}
+						}.start();
+					}
+				}
+			});
+			frame.getContentPane().add(gridLayoutPanel("", cbGraphBrightness, btnBuildGraph));
 			frame.getContentPane().add(btnDoDeflicker);
 			frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			frame.pack();

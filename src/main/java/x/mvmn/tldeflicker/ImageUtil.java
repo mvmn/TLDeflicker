@@ -5,12 +5,15 @@ import java.io.File;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -67,17 +70,24 @@ public class ImageUtil {
 		return (result / argbs.length) / 2.56d;
 	}
 
-	public static void writeJpeg(BufferedImage image, File outputFile, float quality) throws Exception {
-		ImageWriter jpegWriter = ImageIO.getImageWritersByFormatName("jpg").next();
-		ImageWriteParam writeParam = jpegWriter.getDefaultWriteParam();
-		writeParam.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
-		writeParam.setCompressionQuality(quality);
+	public static Set<String> getSupportedImageFormatExtensions() {
+		return Stream.of(javax.imageio.ImageIO.getReaderFileSuffixes()).map(String::toLowerCase).collect(Collectors.toSet());
+	}
+
+	public static void writeImage(BufferedImage image, File outputFile, String format, Float compressionQuality) throws Exception {
+		ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(format).next();
+		ImageWriteParam writeParam = null;
+		if (compressionQuality != null) {
+			writeParam = imageWriter.getDefaultWriteParam();
+			writeParam.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+			writeParam.setCompressionQuality(compressionQuality);
+		}
 		if (outputFile.exists()) {
 			outputFile.delete();
 		}
 		try (FileImageOutputStream fileImageOutputStream = new FileImageOutputStream(outputFile)) {
-			jpegWriter.setOutput(fileImageOutputStream);
-			jpegWriter.write(null, new javax.imageio.IIOImage(image, null, null), writeParam);
+			imageWriter.setOutput(fileImageOutputStream);
+			imageWriter.write(null, new javax.imageio.IIOImage(image, null, null), writeParam);
 		}
 	}
 

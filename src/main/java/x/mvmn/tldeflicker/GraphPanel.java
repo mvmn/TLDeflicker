@@ -28,12 +28,22 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 
 public class GraphPanel extends JPanel {
 
 	private static final long serialVersionUID = 345853583401944720L;
 	protected final BufferedImage backingImage;
 	protected final Graphics2D graphics2D;
+
+	public GraphPanel() {
+		this(UIManager.getColor("Panel.background"));
+	}
+
+	public GraphPanel(Color backgroundColor) {
+		this((int) (Toolkit.getDefaultToolkit().getScreenSize().width * 0.8), (int) (Toolkit.getDefaultToolkit().getScreenSize().height * 0.8),
+				backgroundColor);
+	}
 
 	public GraphPanel(int width, int height, Color backgroundColor) {
 		backingImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
@@ -285,7 +295,7 @@ public class GraphPanel extends JPanel {
 				});
 			} catch (Exception e) {
 				e.printStackTrace();
-				JOptionPane.showConfirmDialog(null, "Error occurred: " + e.getClass().getName() + " " + e.getMessage());
+				JOptionPane.showMessageDialog(null, "Error occurred: " + e.getClass().getName() + " " + e.getMessage());
 			}
 		}
 	}

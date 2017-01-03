@@ -2,6 +2,14 @@ package x.mvmn.tldeflicker;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -70,5 +78,23 @@ public class ImageUtil {
 			jpegWriter.setOutput(fileImageOutputStream);
 			jpegWriter.write(null, new javax.imageio.IIOImage(image, null, null), writeParam);
 		}
+	}
+
+	public static Map<String, Double> calculateAverageBrightnesses(File[] files) throws Exception {
+		final Map<String, Double> values = Collections.synchronizedMap(new HashMap<>());
+		final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+		for (final File file : files) {
+			executorService.submit(new Callable<Void>() {
+				@Override
+				public Void call() throws Exception {
+					BufferedImage bufferedImage = ImageIO.read(file);
+					values.put(file.getAbsolutePath(), calc(bufferedImage));
+					return null;
+				}
+			});
+		}
+		executorService.shutdown();
+		executorService.awaitTermination(365, TimeUnit.DAYS);
+		return new TreeMap<>(values);
 	}
 }

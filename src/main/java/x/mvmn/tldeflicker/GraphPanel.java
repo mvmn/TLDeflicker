@@ -11,7 +11,6 @@ import java.io.File;
 import java.io.FileFilter;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -20,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
@@ -186,9 +186,7 @@ public class GraphPanel extends JPanel {
 	}
 
 	public static void main(String args[]) throws Exception {
-		Set<String> fileExtensions = new HashSet<>();
-		fileExtensions.add("jpg");
-		fileExtensions.add("jpeg");
+		Set<String> fileExtensions = Stream.of(javax.imageio.ImageIO.getReaderFormatNames()).map(String::toLowerCase).collect(Collectors.toSet());
 		if (args.length > 0) {
 			showBrighnessGraph(Arrays.asList(args).stream().map(File::new).filter(File::exists).filter(File::isDirectory).collect(Collectors.toList()),
 					fileExtensions, FileByNameComparator.INSTANCE);

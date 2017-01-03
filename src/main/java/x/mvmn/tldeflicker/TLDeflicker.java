@@ -13,6 +13,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
 
@@ -21,6 +23,7 @@ import x.mvmn.tldeflicker.ImageUtil.ColorChannel;
 public class TLDeflicker {
 
 	public static void main(String args[]) throws Exception {
+		Set<String> fileExtensions = Stream.of(javax.imageio.ImageIO.getReaderFormatNames()).map(String::toLowerCase).collect(Collectors.toSet());
 		if (args.length > 2) {
 			File path = new File(args[0]);
 			if (path.exists() && path.isDirectory()) {
@@ -32,7 +35,11 @@ public class TLDeflicker {
 					@Override
 					public boolean accept(File pathname) {
 						final String fnl = pathname.getName().toLowerCase();
-						return fnl.endsWith(".jpg") || fnl.endsWith(".jpeg");
+						if (fnl.indexOf(".") >= 0) {
+							return fileExtensions.contains(fnl.substring(fnl.lastIndexOf(".") + 1));
+						} else {
+							return false;
+						}
 					}
 				});
 				Arrays.sort(files, FileByNameComparator.INSTANCE);

@@ -2,7 +2,12 @@ package x.mvmn.tldeflicker;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import com.drew.imaging.ImageMetadataReader;
@@ -28,5 +33,37 @@ public class ExifUtil {
 			}
 		}
 		return null;
+	}
+
+	public static List<Double> getValuesAsNumeric(Collection<File> files, String directoryName, String tagName, Double defaultVal)
+			throws ImageProcessingException, IOException {
+		List<String> strValues = getValues(files, directoryName, tagName);
+		return strValues.stream().map(new Function<String, Double>() {
+			@Override
+			public Double apply(String strVal) {
+				Double result;
+				int idx = strVal.indexOf("/");
+				try {
+					if (idx > 0) {
+						result = Double.parseDouble(strVal.substring(0, idx)) / Double.parseDouble(strVal.substring(idx + 1));
+					} else {
+						result = Double.parseDouble(strVal);
+					}
+				} catch (NumberFormatException e) {
+					result = defaultVal;
+				}
+				return result;
+			}
+		}).collect(Collectors.toList());
+	}
+
+	public static List<String> getValues(Collection<File> files, String directoryName, String tagName) throws ImageProcessingException, IOException {
+		List<String> result = new ArrayList<>(files.size());
+
+		for (File file : files) {
+			result.add(getValue(file, directoryName, tagName));
+		}
+
+		return result;
 	}
 }

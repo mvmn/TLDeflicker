@@ -61,6 +61,7 @@ public class TLDeflicker {
 			}
 		} else {
 			JFrame frame = new JFrame("TLDeflicker");
+			frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			JTextField txInputPath = new JTextField("");
 			txInputPath.setEditable(false);
 			JTextField txOutputPath = new JTextField("");
@@ -191,9 +192,28 @@ public class TLDeflicker {
 						new Thread() {
 							public void run() {
 								try {
-									process(new File(txInputPath.getText()), new File(txOutputPath.getText()), tfExifDirectory.getText(), tfExifTag.getText(),
+									File dir = new File(txInputPath.getText());
+									GraphPanel graphPanel = process(dir, new File(txOutputPath.getText()), tfExifDirectory.getText(), tfExifTag.getText(),
 											outFormatCombo.getSelectedItem().toString(), ((float) sliderQuality.getValue()) / 100, true,
 											cbGraphBrightness.isSelected());
+									try {
+										List<Double> values = ExifUtil.getValuesAsNumeric(
+												Arrays.asList(FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions())),
+												tfExifDirectory.getText(), tfExifTag.getText(), 0d);
+										if (!values.isEmpty()) {
+
+											double max = values.stream().mapToDouble(Double::doubleValue).max().getAsDouble();
+											Serie exposureSerie = graphPanel.createSerie(Color.getHSBColor(0.8f, 0.8f, 0.4f), values.size(), 0d, max, max / 10,
+													true);
+											for (int i = 0; i < values.size(); i++) {
+												exposureSerie.setValue(i, values.get(i));
+											}
+										}
+									} catch (Exception e) {
+										e.printStackTrace();
+										JOptionPane.showMessageDialog(frame,
+												"Error occurred while plotting exposures: " + e.getClass().getName() + " " + e.getMessage());
+									}
 								} catch (Exception e) {
 									e.printStackTrace();
 									JOptionPane.showMessageDialog(frame, "Error occurred: " + e.getClass().getName() + " " + e.getMessage());
@@ -222,8 +242,32 @@ public class TLDeflicker {
 					if (JFileChooser.APPROVE_OPTION == jfc.showOpenDialog(null)) {
 						new Thread() {
 							public void run() {
-								GraphPanel.showBrighnessGraph(Arrays.asList(jfc.getSelectedFiles()), ImageUtil.getSupportedImageFormatExtensions(),
-										FileByNameComparator.INSTANCE);
+								GraphPanel graphPanel = GraphPanel.showBrighnessGraph(Arrays.asList(jfc.getSelectedFiles()),
+										ImageUtil.getSupportedImageFormatExtensions(), FileByNameComparator.INSTANCE);
+
+								for (int index = 0; index < jfc.getSelectedFiles().length; index++) {
+									File dir = jfc.getSelectedFiles()[index];
+									try {
+										List<Double> values = ExifUtil.getValuesAsNumeric(
+												Arrays.asList(FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions())),
+												tfExifDirectory.getText(), tfExifTag.getText(), 0d);
+										if (!values.isEmpty()) {
+
+											double max = values.stream().mapToDouble(Double::doubleValue).max().getAsDouble();
+											Serie exposureSerie = graphPanel.createSerie(
+													Color.getHSBColor(((float) index) / jfc.getSelectedFiles().length * 0.8f, 0.8f, 0.4f), values.size(), 0d,
+													max, max / 10, true);
+											for (int i = 0; i < values.size(); i++) {
+												exposureSerie.setValue(i, values.get(i));
+											}
+										}
+									} catch (Exception e) {
+										e.printStackTrace();
+										JOptionPane.showMessageDialog(frame,
+												"Error occurred while plotting exposures: " + e.getClass().getName() + " " + e.getMessage());
+									}
+								}
+
 							}
 						}.start();
 					}
@@ -231,7 +275,6 @@ public class TLDeflicker {
 			});
 			frame.getContentPane().add(gridLayoutPanel("", cbGraphBrightness, btnBuildGraph));
 			frame.getContentPane().add(btnDoDeflicker);
-			frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			frame.pack();
 			frame.setVisible(true);
 		}
@@ -270,8 +313,9 @@ public class TLDeflicker {
 		return result;
 	}
 
-	public static void process(File path, File outputPath, String exifDirectory, String exifTag, String imageOutputFormat, float quality,
+	public static GraphPanel process(File path, File outputPath, String exifDirectory, String exifTag, String imageOutputFormat, float quality,
 			boolean guiProgressIndication, boolean chartBrightnesses) throws Exception {
+		GraphPanel graphPanel = null;
 		Set<String> fileExtensions = ImageUtil.getSupportedImageFormatExtensions();
 		if (path.exists() && path.isDirectory()) {
 			File outPath = outputPath == null ? new File(path, "deflickered") : outputPath;
@@ -291,7 +335,7 @@ public class TLDeflicker {
 			});
 			Arrays.sort(files, FileByNameComparator.INSTANCE);
 
-			GraphPanel graphPanel = chartBrightnesses ? new GraphPanel(Color.WHITE) : null;
+			graphPanel = chartBrightnesses ? new GraphPanel(Color.WHITE) : null;
 			Serie inputSerie = chartBrightnesses ? graphPanel.createSerie(Color.RED, files.length, 0d, 100d, 10d) : null;
 			Serie outputSerie = chartBrightnesses ? graphPanel.createSerie(Color.GREEN, files.length, 0d, 100d, 10d) : null;
 			final JLabel progressText;
@@ -300,6 +344,7 @@ public class TLDeflicker {
 			final JPanel progressPanel;
 			if (guiProgressIndication) {
 				frame = new JFrame("TLDeflicker: progress");
+				frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 				progressText = new JLabel("Initializing...");
 				progressBar = new JProgressBar(0, files.length);
 				progressBar.setValue(0);
@@ -491,5 +536,6 @@ public class TLDeflicker {
 				System.out.println("Processing finished.");
 			}
 		}
+		return graphPanel;
 	}
 }

@@ -8,7 +8,6 @@ import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileFilter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -18,10 +17,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import javax.swing.ImageIcon;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -82,7 +79,7 @@ public class GraphPanel extends JPanel {
 
 		protected final Double[] values;
 
-		protected Serie(Color color, int size, double min, double max, Double gridlineOffset) {
+		protected Serie(Color color, int size, double min, double max, Double gridlineOffset, boolean gridlineValueRight) {
 			this.size = size;
 			this.values = new Double[size];
 			this.color = color;
@@ -108,10 +105,11 @@ public class GraphPanel extends JPanel {
 					while (!(v > max + v / 2)) {
 						int y = effectiveHeight - (int) (v * valueYMultiplier) + topMargin - 1;
 						graphics2D.drawLine(0, y, backingImageWidth, y);
-						int vint = (int) v * 100;
-						int frac = vint % 100;
-						vint = (vint - frac) / 100;
-						graphics2D.drawString("" + vint + (frac != 0 ? "." + frac : ""), 6f, y - 6f);
+						int vint = (int) (v * 1000);
+						int frac = vint % 1000;
+						vint = (vint - frac) / 1000;
+						graphics2D.drawString("" + vint + (frac != 0 ? "." + String.format("%03d", frac) : ""),
+								gridlineValueRight ? backingImageWidth - 50f : 6f, y - 6f);
 						v += gridlineOffset;
 					}
 				}
@@ -130,15 +128,15 @@ public class GraphPanel extends JPanel {
 					nextVal = values[index + 1];
 				}
 			}
-			int x = (int) (index * valueXOffset);
-			int y = effectiveHeight - (int) ((value - min) * valueYMultiplier);
+			int x = Math.min((int) (index * valueXOffset), backingImageWidth - 1);
+			int y = topMargin + effectiveHeight - (int) ((value - min) * valueYMultiplier);
 			synchronized (graphics2D) {
 				graphics2D.setColor(transparentColor);
 				graphics2D.fillOval(x, y - 1, 3, 3);
 			}
 			if (prevVal != null) {
 				int x2 = (int) ((index - 1) * valueXOffset);
-				int y2 = effectiveHeight - (int) ((prevVal - min) * valueYMultiplier);
+				int y2 = topMargin + effectiveHeight - (int) ((prevVal - min) * valueYMultiplier);
 				synchronized (graphics2D) {
 					graphics2D.setColor(color);
 					graphics2D.drawLine(x, y, x2, y2);
@@ -147,7 +145,7 @@ public class GraphPanel extends JPanel {
 
 			if (nextVal != null) {
 				int x2 = (int) ((index + 1) * valueXOffset);
-				int y2 = effectiveHeight - (int) ((nextVal - min) * valueYMultiplier);
+				int y2 = topMargin + effectiveHeight - (int) ((nextVal - min) * valueYMultiplier);
 				synchronized (graphics2D) {
 					graphics2D.setColor(color);
 					graphics2D.drawLine(x, y, x2, y2);
@@ -161,7 +159,11 @@ public class GraphPanel extends JPanel {
 	}
 
 	public Serie createSerie(Color color, int size, double min, double max, Double gridlineOffset) {
-		return new Serie(color, size, min, max, gridlineOffset);
+		return createSerie(color, size, min, max, gridlineOffset, false);
+	}
+
+	public Serie createSerie(Color color, int size, double min, double max, Double gridlineOffset, boolean gridlineValueRight) {
+		return new Serie(color, size, min, max, gridlineOffset, gridlineValueRight);
 	}
 
 	public void fillSerie(Color graphColor, Collection<? extends Number> values, Double minOverride, Double maxOverride, Double gridlineOffset) {
@@ -194,27 +196,14 @@ public class GraphPanel extends JPanel {
 		}
 	}
 
-	public static void main(String args[]) {
-		Set<String> fileExtensions = ImageUtil.getSupportedImageFormatExtensions();
-		if (args.length > 0) {
-			showBrighnessGraph(Arrays.asList(args).stream().map(File::new).filter(File::exists).filter(File::isDirectory).collect(Collectors.toList()),
-					fileExtensions, FileByNameComparator.INSTANCE);
-		} else {
-			JFileChooser jfc = new JFileChooser();
-			jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-			jfc.setMultiSelectionEnabled(true);
-			if (JFileChooser.APPROVE_OPTION == jfc.showOpenDialog(null)) {
-				showBrighnessGraph(Arrays.asList(jfc.getSelectedFiles()), fileExtensions, FileByNameComparator.INSTANCE);
-			}
-		}
-	}
-
-	public static void showBrighnessGraph(List<File> folders, Set<String> fileExtensions, FileByNameComparator fileComparator) {
+	public static GraphPanel showBrighnessGraph(List<File> folders, Set<String> fileExtensions, FileByNameComparator fileComparator) {
+		GraphPanel graphPanel = null;
 		if (folders.size() > 0) {
 			try {
 				final JLabel lblProgress = new JLabel("Processing files...");
 				Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-				GraphPanel graphPanel = new GraphPanel((int) (screenSize.width * 0.8), (int) (screenSize.height * 0.8), Color.WHITE);
+				graphPanel = new GraphPanel((int) (screenSize.width * 0.8), (int) (screenSize.height * 0.8), Color.WHITE);
+				GraphPanel graphPanelFinal = graphPanel;
 				JFrame frame = new JFrame("Average brightnesses of images");
 				frame.getContentPane().setLayout(new BorderLayout());
 				frame.getContentPane().add(new JScrollPane(graphPanel), BorderLayout.CENTER);
@@ -233,22 +222,10 @@ public class GraphPanel extends JPanel {
 						public Void call() throws Exception {
 							File dir = folders.get(argIndexFinal);
 							if (dir.exists() && dir.isDirectory()) {
-								final File[] files = dir.listFiles(new FileFilter() {
-									@Override
-									public boolean accept(File pathname) {
-										boolean result = false;
-										String lcName = pathname.getName().toLowerCase();
-										if (lcName.indexOf(".") >= 0) {
-											int dotIdx = lcName.lastIndexOf(".");
-											String lcCxtension = lcName.substring(dotIdx + 1);
-											result = fileExtensions.contains(lcCxtension);
-										}
-										return result;
-									}
-								});
+								final File[] files = FileUtil.listFilesByExtensions(dir, fileExtensions);
 								Arrays.sort(files, fileComparator);
 								Color color = Color.getHSBColor(((float) argIndexFinal) / folders.size() * 0.8f, 1f, 0.5f);
-								final Serie serie = graphPanel.createSerie(color, files.length, 0d, 100d, 10d);
+								final Serie serie = graphPanelFinal.createSerie(color, files.length, 0d, 100d, 10d);
 
 								SwingUtilities.invokeLater(new Runnable() {
 									@Override
@@ -267,11 +244,11 @@ public class GraphPanel extends JPanel {
 								});
 								ImageUtil.calculateAverageBrightnesses(files, new Function<Tuple<Integer, File, Double, Void, Void>, Void>() {
 									@Override
-									public Void apply(Tuple<Integer, File, Double, Void, Void> pairFileBrightness) {
+									public Void apply(Tuple<Integer, File, Double, Void, Void> tupleIndexFileBrightness) {
 										SwingUtilities.invokeLater(new Runnable() {
 											@Override
 											public void run() {
-												serie.setValue(pairFileBrightness.getA(), pairFileBrightness.getC());
+												serie.setValue(tupleIndexFileBrightness.getA(), tupleIndexFileBrightness.getC());
 											}
 										});
 										return null;
@@ -298,5 +275,6 @@ public class GraphPanel extends JPanel {
 				JOptionPane.showMessageDialog(null, "Error occurred: " + e.getClass().getName() + " " + e.getMessage());
 			}
 		}
+		return graphPanel;
 	}
 }

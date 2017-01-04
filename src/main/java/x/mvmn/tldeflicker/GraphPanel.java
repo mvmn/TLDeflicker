@@ -2,28 +2,20 @@ package x.mvmn.tldeflicker;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Dimension;
+import java.awt.Container;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import javax.swing.ImageIcon;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
@@ -84,6 +76,9 @@ public class GraphPanel extends JPanel {
 			this.values = new Double[size];
 			this.color = color;
 			this.min = min;
+			if (max - min < 0.1) {
+				max = min + 0.1d;
+			}
 			this.max = max;
 			this.gridlineOffset = gridlineOffset;
 			transparentColor = new Color(color.getRed(), color.getGreen(), color.getBlue(), 64);
@@ -100,7 +95,7 @@ public class GraphPanel extends JPanel {
 
 			synchronized (graphics2D) {
 				graphics2D.setColor(transparentColor);
-				if (gridlineOffset != null) {
+				if (gridlineOffset != null && gridlineOffset > 0.01) {
 					double v = min;
 					while (!(v > max + v / 2)) {
 						int y = effectiveHeight - (int) (v * valueYMultiplier) + topMargin - 1;
@@ -196,85 +191,66 @@ public class GraphPanel extends JPanel {
 		}
 	}
 
-	public static GraphPanel showBrighnessGraph(List<File> folders, Set<String> fileExtensions, FileByNameComparator fileComparator) {
-		GraphPanel graphPanel = null;
-		if (folders.size() > 0) {
-			try {
-				final JLabel lblProgress = new JLabel("Processing files...");
-				Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-				graphPanel = new GraphPanel((int) (screenSize.width * 0.8), (int) (screenSize.height * 0.8), Color.WHITE);
-				GraphPanel graphPanelFinal = graphPanel;
-				JFrame frame = new JFrame("Average brightnesses of images");
-				frame.getContentPane().setLayout(new BorderLayout());
-				frame.getContentPane().add(new JScrollPane(graphPanel), BorderLayout.CENTER);
-				frame.getContentPane().add(lblProgress, BorderLayout.NORTH);
-				frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-				frame.pack();
-				frame.setVisible(true);
-				BufferedImage bufImg = graphPanel.getBackingImage();
-				Graphics2D graph2d = graphPanel.getGraphics2D();
+	public static void populateBrighnessGraph(final GraphPanel graphPanel, String graphName, int graphIndex, int totalGraphs, File[] files,
+			Set<String> fileExtensions, FileByNameComparator fileComparator, Container uiContainer, int graphWidth, int graphHeight,
+			double[] collectBrightnesses) {
+		try {
+			final JLabel lblProgress = new JLabel("Processing files...");
+			BufferedImage bufImg = graphPanel.getBackingImage();
+			Graphics2D graph2d = graphPanel.getGraphics2D();
 
-				final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-				for (int argIndex = 0; argIndex < folders.size(); argIndex++) {
-					final int argIndexFinal = argIndex;
-					executorService.submit(new Callable<Void>() {
+			Color color = Color.getHSBColor(((float) graphIndex) / totalGraphs * 0.8f, 1f, 0.5f);
+			final Serie serie = graphPanel.createSerie(color, files.length, 0d, 100d, 10d);
+			SwingUtilities.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					uiContainer.add(lblProgress);
+					uiContainer.invalidate();
+					uiContainer.revalidate();
+					uiContainer.repaint();
+
+					synchronized (graph2d) {
+						graph2d.setColor(color);
+						graph2d.setFont(uiContainer.getFont());
+						graph2d.drawString(graphName, 30f,
+								bufImg.getHeight() - 10f - ((float) graphIndex) / totalGraphs * (graph2d.getFontMetrics().getHeight() * 2f));
+					}
+
+					graphPanel.invalidate();
+					graphPanel.revalidate();
+					graphPanel.repaint();
+					uiContainer.invalidate();
+					uiContainer.revalidate();
+					uiContainer.repaint();
+				}
+			});
+			ImageUtil.calculateAverageBrightnesses(files, new Function<Tuple<Integer, File, Double, Void, Void>, Void>() {
+				@Override
+				public Void apply(Tuple<Integer, File, Double, Void, Void> tupleIndexFileBrightness) {
+					SwingUtilities.invokeLater(new Runnable() {
 						@Override
-						public Void call() throws Exception {
-							File dir = folders.get(argIndexFinal);
-							if (dir.exists() && dir.isDirectory()) {
-								final File[] files = FileUtil.listFilesByExtensions(dir, fileExtensions);
-								Arrays.sort(files, fileComparator);
-								Color color = Color.getHSBColor(((float) argIndexFinal) / folders.size() * 0.8f, 1f, 0.5f);
-								final Serie serie = graphPanelFinal.createSerie(color, files.length, 0d, 100d, 10d);
-
-								SwingUtilities.invokeLater(new Runnable() {
-									@Override
-									public void run() {
-										synchronized (graph2d) {
-											graph2d.setColor(color);
-											graph2d.setFont(frame.getFont());
-											graph2d.drawString(dir.getName(), 30f, bufImg.getHeight() - 10f
-													- ((float) argIndexFinal) / folders.size() * (graph2d.getFontMetrics().getHeight() * 2f));
-										}
-
-										frame.invalidate();
-										frame.revalidate();
-										frame.repaint();
-									}
-								});
-								ImageUtil.calculateAverageBrightnesses(files, new Function<Tuple<Integer, File, Double, Void, Void>, Void>() {
-									@Override
-									public Void apply(Tuple<Integer, File, Double, Void, Void> tupleIndexFileBrightness) {
-										SwingUtilities.invokeLater(new Runnable() {
-											@Override
-											public void run() {
-												serie.setValue(tupleIndexFileBrightness.getA(), tupleIndexFileBrightness.getC());
-											}
-										});
-										return null;
-									}
-								});
+						public void run() {
+							serie.setValue(tupleIndexFileBrightness.getA(), tupleIndexFileBrightness.getC());
+							if (collectBrightnesses != null) {
+								collectBrightnesses[tupleIndexFileBrightness.getA()] = tupleIndexFileBrightness.getC();
 							}
-							return null;
 						}
 					});
+					return null;
 				}
-				executorService.shutdown();
-				executorService.awaitTermination(365, TimeUnit.DAYS);
-				SwingUtilities.invokeLater(new Runnable() {
-					@Override
-					public void run() {
-						frame.getContentPane().remove(lblProgress);
-						frame.invalidate();
-						frame.revalidate();
-						frame.repaint();
-					}
-				});
-			} catch (Exception e) {
-				e.printStackTrace();
-				JOptionPane.showMessageDialog(null, "Error occurred: " + e.getClass().getName() + " " + e.getMessage());
-			}
+			});
+			SwingUtilities.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					uiContainer.remove(lblProgress);
+					uiContainer.invalidate();
+					uiContainer.revalidate();
+					uiContainer.repaint();
+				}
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+			JOptionPane.showMessageDialog(null, "Error occurred: " + e.getClass().getName() + " " + e.getMessage());
 		}
-		return graphPanel;
 	}
 }

@@ -2,7 +2,9 @@ package x.mvmn.tldeflicker;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
@@ -33,6 +35,8 @@ import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSlider;
+import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -242,25 +246,46 @@ public class TLDeflicker {
 					if (JFileChooser.APPROVE_OPTION == jfc.showOpenDialog(null)) {
 						new Thread() {
 							public void run() {
-								GraphPanel graphPanel = GraphPanel.showBrighnessGraph(Arrays.asList(jfc.getSelectedFiles()),
-										ImageUtil.getSupportedImageFormatExtensions(), FileByNameComparator.INSTANCE);
+								JPanel progressPanel = new JPanel();
+								JTabbedPane tabbedPane = new JTabbedPane();
+								Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+								GraphPanel grafPanel = new GraphPanel((int) (screenSize.width * 0.8), (int) (screenSize.height * 0.8), Color.WHITE);
+
+								JFrame frame = new JFrame("Average brightnesses of images");
+								frame.getContentPane().setLayout(new BorderLayout());
+
+								JSplitPane jSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(grafPanel), tabbedPane);
+								frame.getContentPane().add(jSplitPane, BorderLayout.CENTER);
+								frame.getContentPane().add(progressPanel, BorderLayout.NORTH);
+								frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+								frame.pack();
+								frame.setVisible(true);
 
 								for (int index = 0; index < jfc.getSelectedFiles().length; index++) {
 									File dir = jfc.getSelectedFiles()[index];
 									try {
-										List<Double> values = ExifUtil.getValuesAsNumeric(
-												Arrays.asList(FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions())),
-												tfExifDirectory.getText(), tfExifTag.getText(), 0d);
-										if (!values.isEmpty()) {
+										File[] files = FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions());
+										double[] brightnesses = new double[files.length];
 
-											double max = values.stream().mapToDouble(Double::doubleValue).max().getAsDouble();
-											Serie exposureSerie = graphPanel.createSerie(
-													Color.getHSBColor(((float) index) / jfc.getSelectedFiles().length * 0.8f, 0.8f, 0.4f), values.size(), 0d,
-													max, max / 10, true);
-											for (int i = 0; i < values.size(); i++) {
-												exposureSerie.setValue(i, values.get(i));
-											}
+										GraphPanel.populateBrighnessGraph(grafPanel, dir.getAbsolutePath(), index, jfc.getSelectedFiles().length, files,
+												ImageUtil.getSupportedImageFormatExtensions(), FileByNameComparator.INSTANCE, progressPanel,
+												(int) (screenSize.width * 0.8), (int) (screenSize.height * 0.8), brightnesses);
+
+										List<Double> values = ExifUtil.getValuesAsNumeric(Arrays.asList(files), tfExifDirectory.getText(), tfExifTag.getText(),
+												0d);
+										double max = values.stream().mapToDouble(Double::doubleValue).max().getAsDouble();
+										Serie exposureSerie = grafPanel.createSerie(
+												Color.getHSBColor(((float) index) / jfc.getSelectedFiles().length * 0.8f, 0.8f, 0.4f), values.size(), 0d, max,
+												max / 10, true);
+										DefaultTableModel tableModel = new DefaultTableModel(new String[] { "File", "Exposure", "Brightness" }, 0);
+										JTable table = new JTable(tableModel);
+										for (int i = 0; i < values.size(); i++) {
+											exposureSerie.setValue(i, values.get(i));
+											tableModel.addRow(new Object[] { files[i].getName(), String.format("%5f", values.get(i)),
+													String.format("%5f", brightnesses[i]) });
 										}
+										tabbedPane.addTab(dir.getName(), new JScrollPane(table));
+
 									} catch (Exception e) {
 										e.printStackTrace();
 										JOptionPane.showMessageDialog(frame,

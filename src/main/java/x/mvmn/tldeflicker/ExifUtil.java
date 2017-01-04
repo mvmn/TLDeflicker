@@ -37,31 +37,35 @@ public class ExifUtil {
 
 	public static List<Double> getValuesAsNumeric(Collection<File> files, String directoryName, String tagName, Double defaultVal)
 			throws ImageProcessingException, IOException {
-		List<String> strValues = getValues(files, directoryName, tagName);
+		List<String> strValues = getValues(files, directoryName, tagName, String.valueOf(defaultVal));
 		return strValues.stream().map(new Function<String, Double>() {
 			@Override
 			public Double apply(String strVal) {
-				Double result;
-				int idx = strVal.indexOf("/");
-				try {
-					if (idx > 0) {
-						result = Double.parseDouble(strVal.substring(0, idx)) / Double.parseDouble(strVal.substring(idx + 1));
-					} else {
-						result = Double.parseDouble(strVal);
+				Double result = defaultVal;
+				if (strVal != null) {
+					int idx = strVal.indexOf("/");
+					try {
+						if (idx > 0) {
+							result = Double.parseDouble(strVal.substring(0, idx)) / Double.parseDouble(strVal.substring(idx + 1));
+						} else {
+							result = Double.parseDouble(strVal);
+						}
+					} catch (NumberFormatException e) {
+						result = defaultVal;
 					}
-				} catch (NumberFormatException e) {
-					result = defaultVal;
 				}
 				return result;
 			}
 		}).collect(Collectors.toList());
 	}
 
-	public static List<String> getValues(Collection<File> files, String directoryName, String tagName) throws ImageProcessingException, IOException {
+	public static List<String> getValues(Collection<File> files, String directoryName, String tagName, String defaultValue)
+			throws ImageProcessingException, IOException {
 		List<String> result = new ArrayList<>(files.size());
 
 		for (File file : files) {
-			result.add(getValue(file, directoryName, tagName));
+			String value = getValue(file, directoryName, tagName);
+			result.add(value == null ? defaultValue : value);
 		}
 
 		return result;

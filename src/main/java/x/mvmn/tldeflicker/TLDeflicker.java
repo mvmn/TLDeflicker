@@ -58,7 +58,7 @@ public class TLDeflicker {
 	public static void main(String args[]) {
 		if (args.length > 2) {
 			try {
-				process(new File(args[0]), new File(new File(args[0]), "deflickered"), args[1], args[2], args.length > 3 ? args[3] : "jpg",
+				process(null, new File(args[0]), new File(new File(args[0]), "deflickered"), args[1], args[2], args.length > 3 ? args[3] : "jpg",
 						args.length > 4 ? Float.parseFloat(args[4].trim()) : 1f, false, false);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -196,22 +196,34 @@ public class TLDeflicker {
 						new Thread() {
 							public void run() {
 								try {
+									boolean doGraph = cbGraphBrightness.isSelected();
 									File dir = new File(txInputPath.getText());
-									GraphPanel graphPanel = process(dir, new File(txOutputPath.getText()), tfExifDirectory.getText(), tfExifTag.getText(),
-											outFormatCombo.getSelectedItem().toString(), ((float) sliderQuality.getValue()) / 100, true,
-											cbGraphBrightness.isSelected());
+									GraphPanel graphPanel;
+									// JFrame frame =
+									process(graphPanel = doGraph ? new GraphPanel(Color.WHITE) : null, dir, new File(txOutputPath.getText()),
+											tfExifDirectory.getText(), tfExifTag.getText(), outFormatCombo.getSelectedItem().toString(),
+											((float) sliderQuality.getValue()) / 100, true, doGraph);
 									try {
-										List<Double> values = ExifUtil.getValuesAsNumeric(
-												Arrays.asList(FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions())),
-												tfExifDirectory.getText(), tfExifTag.getText(), 0d);
-										if (!values.isEmpty()) {
+										File[] files = FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions());
+										List<Double> values = ExifUtil.getValuesAsNumeric(Arrays.asList(files), tfExifDirectory.getText(), tfExifTag.getText(),
+												0d);
 
-											double max = values.stream().mapToDouble(Double::doubleValue).max().getAsDouble();
-											Serie exposureSerie = graphPanel.createSerie(Color.getHSBColor(0.8f, 0.8f, 0.4f), values.size(), 0d, max, max / 10,
-													true);
-											for (int i = 0; i < values.size(); i++) {
+										double max = values.stream().mapToDouble(Double::doubleValue).max().getAsDouble();
+
+										Serie exposureSerie = doGraph
+												? graphPanel.createSerie(Color.getHSBColor(0.8f, 0.8f, 0.4f), values.size(), 0d, max, max / 10, true) : null;
+										/*
+										 * DefaultTableModel tableModel = new DefaultTableModel(new String[] { "File", "Exposure", "Brightness" }, 0); JTable
+										 * table = new JTable(tableModel);
+										 */
+										for (int i = 0; i < values.size(); i++) {
+											if (doGraph) {
 												exposureSerie.setValue(i, values.get(i));
 											}
+											/*
+											 * tableModel.addRow(new Object[] { files[i].getName(), String.format("%5f", values.get(i)), String.format("%5f",
+											 * brightnesses[i]) });
+											 */
 										}
 									} catch (Exception e) {
 										e.printStackTrace();
@@ -285,7 +297,6 @@ public class TLDeflicker {
 													String.format("%5f", brightnesses[i]) });
 										}
 										tabbedPane.addTab(dir.getName(), new JScrollPane(table));
-
 									} catch (Exception e) {
 										e.printStackTrace();
 										JOptionPane.showMessageDialog(frame,
@@ -338,9 +349,9 @@ public class TLDeflicker {
 		return result;
 	}
 
-	public static GraphPanel process(File path, File outputPath, String exifDirectory, String exifTag, String imageOutputFormat, float quality,
-			boolean guiProgressIndication, boolean chartBrightnesses) throws Exception {
-		GraphPanel graphPanel = null;
+	public static JFrame process(final GraphPanel graphPanel, File path, File outputPath, String exifDirectory, String exifTag, String imageOutputFormat,
+			float quality, boolean guiProgressIndication, boolean chartBrightnesses) throws Exception {
+		JFrame result = null;
 		Set<String> fileExtensions = ImageUtil.getSupportedImageFormatExtensions();
 		if (path.exists() && path.isDirectory()) {
 			File outPath = outputPath == null ? new File(path, "deflickered") : outputPath;
@@ -360,7 +371,6 @@ public class TLDeflicker {
 			});
 			Arrays.sort(files, FileByNameComparator.INSTANCE);
 
-			graphPanel = chartBrightnesses ? new GraphPanel(Color.WHITE) : null;
 			Serie inputSerie = chartBrightnesses ? graphPanel.createSerie(Color.RED, files.length, 0d, 100d, 10d) : null;
 			Serie outputSerie = chartBrightnesses ? graphPanel.createSerie(Color.GREEN, files.length, 0d, 100d, 10d) : null;
 			final JLabel progressText;
@@ -369,6 +379,7 @@ public class TLDeflicker {
 			final JPanel progressPanel;
 			if (guiProgressIndication) {
 				frame = new JFrame("TLDeflicker: progress");
+				result = frame;
 				frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 				progressText = new JLabel("Initializing...");
 				progressBar = new JProgressBar(0, files.length);
@@ -561,6 +572,6 @@ public class TLDeflicker {
 				System.out.println("Processing finished.");
 			}
 		}
-		return graphPanel;
+		return result;
 	}
 }

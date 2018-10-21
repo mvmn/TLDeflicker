@@ -192,8 +192,7 @@ public class GraphPanel extends JPanel {
 	}
 
 	public static void populateBrighnessGraph(final GraphPanel graphPanel, String graphName, int graphIndex, int totalGraphs, File[] files,
-			Set<String> fileExtensions, FileByNameComparator fileComparator, Container uiContainer, int graphWidth, int graphHeight,
-			double[] collectBrightnesses) {
+			Set<String> fileExtensions, Container uiContainer, int graphWidth, int graphHeight, double[] collectBrightnesses) {
 		try {
 			final JLabel lblProgress = new JLabel("Processing files...");
 			BufferedImage bufImg = graphPanel.getBackingImage();

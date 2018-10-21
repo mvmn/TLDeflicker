@@ -205,13 +205,15 @@ public class TLDeflicker {
 											((float) sliderQuality.getValue()) / 100, true, doGraph);
 									try {
 										File[] files = FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions());
+										Arrays.sort(files, FileByNameComparator.INSTANCE);
 										List<Double> values = ExifUtil.getValuesAsNumeric(Arrays.asList(files), tfExifDirectory.getText(), tfExifTag.getText(),
 												0d);
 
 										double max = values.stream().mapToDouble(Double::doubleValue).max().getAsDouble();
 
 										Serie exposureSerie = doGraph
-												? graphPanel.createSerie(Color.getHSBColor(0.8f, 0.8f, 0.4f), values.size(), 0d, max, max / 10, true) : null;
+												? graphPanel.createSerie(Color.getHSBColor(0.8f, 0.8f, 0.4f), values.size(), 0d, max, max / 10, true)
+												: null;
 										/*
 										 * DefaultTableModel tableModel = new DefaultTableModel(new String[] { "File", "Exposure", "Brightness" }, 0); JTable
 										 * table = new JTable(tableModel);
@@ -277,11 +279,12 @@ public class TLDeflicker {
 									File dir = jfc.getSelectedFiles()[index];
 									try {
 										File[] files = FileUtil.listFilesByExtensions(dir, ImageUtil.getSupportedImageFormatExtensions());
+										Arrays.sort(files, FileByNameComparator.INSTANCE);
 										double[] brightnesses = new double[files.length];
 
 										GraphPanel.populateBrighnessGraph(grafPanel, dir.getAbsolutePath(), index, jfc.getSelectedFiles().length, files,
-												ImageUtil.getSupportedImageFormatExtensions(), FileByNameComparator.INSTANCE, progressPanel,
-												(int) (screenSize.width * 0.8), (int) (screenSize.height * 0.8), brightnesses);
+												ImageUtil.getSupportedImageFormatExtensions(), progressPanel, (int) (screenSize.width * 0.8),
+												(int) (screenSize.height * 0.8), brightnesses);
 
 										List<Double> values = ExifUtil.getValuesAsNumeric(Arrays.asList(files), tfExifDirectory.getText(), tfExifTag.getText(),
 												0d);
